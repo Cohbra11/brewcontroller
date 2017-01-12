@@ -1,0 +1,601 @@
+
+<!DOCTYPE html>
+<html lang="en" ng-app>
+<head>
+	<meta content="text/html; charset=utf-8" http-equiv="Content-Type" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<!--<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>-->
+	<script language="javascript" type="text/javascript" src="js/jquery.min.js"></script>
+	<script language="javascript" type="text/javascript" src="lib/p5js/p5.js"></script>
+	<script language="javascript" type="text/javascript" src="lib/p5js/p5.dom.js"></script>
+	<script language="javascript" type="text/javascript" src="lib/p5js/p5.sound.js"></script>
+	
+    <link rel="stylesheet" href="css/jquery-ui.min.css"/>
+    <link rel="stylesheet" href="css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="font-awesome/css/font-awesome.min.css"/>					
+    <link rel="stylesheet" href="css/jquery-ui.theme.min.css"/>
+	<!-- this line removes any default padding and style. you might only need one of these values set. -->
+  	<!--<link rel="stylesheet" href="bootstrap/dist/css/bootstrap.min.css">-->
+  	<link rel="stylesheet" href="css/lobipanel.min.css"/>
+
+	<style> body {padding: 0; margin: 0; font-size:14px;} </style>
+	<title>Brew Controller</title>
+	
+	<style type="text/css">
+	html, body {
+		text-align:center;
+		background-color:#111;
+		color:gray;
+	  	margin: 0;
+	}
+	#page-wrap {
+	  	text-align: center;
+	  	margin: 0;
+	}
+	header {
+		text-align:center;
+		font-size:xx-large;
+		/*width:100%;*/
+	  	margin: 0;
+	}
+	#controls {
+		text-align: center;
+	  	margin: 0;
+	}
+	#controls-wrapper {
+		text-align:center;
+	  	margin: 0;
+	}
+	div[class=controlChart]{
+		text-align:center;
+	  	margin: 0;
+	}
+	.controls {
+		float:left;
+	}
+	.clickable{
+	    cursor: pointer;   
+	}
+	.hideContent{
+		display:none;
+	}
+	#chart0panel, #chart1panel{
+		display:none;
+	}
+	.collapse{
+		display: none;
+	}
+	.clickable {
+	    cursor: pointer;
+	}
+	
+	</style>
+    <script>
+    	try{
+		    function recipeController($scope) {
+				var heartBeatID = 1;
+				var lastHeartBeatID;
+				var socket = io.connect();
+				var alreadyNotified = false;
+				$scope.equipmentName = '';
+				$scope.recipe = {};
+				socket.on('connect', function () {
+				//$scope.setName();
+				});
+				socket.on('equipmentName0', function (equipmentName) {
+				document.getElementById("chart0name").innerHTML = equipmentName;
+				});
+				socket.on('equipmentName1', function (equipmentName) {
+				document.getElementById("chart1name").innerHTML = equipmentName;
+				});
+				socket.on('recipe', function (recipeJSON) {
+			        //Get the recipe name
+			        console.log("-----------------------------------------");
+			        parseRecipe(recipeJSON, "recipeData");
+			        try{
+			        	for(var i in recipeJSON.EQUIPMENTS[0].EQUIPMENT){
+			        		$('.hideChart').show();
+			        		document.getElementById("chart"+i+"name").innerHTML = recipeJSON.EQUIPMENTS[0].EQUIPMENT[i].NAME[0];
+			        	}
+			        } catch(err) {
+			        	try{
+			        		document.getElementById("chart0name").innerHTML = recipeJSON.EQUIPMENT[0].NAME[0];
+			        		$('.hideChart').hide();
+			        	} catch(err) {
+			        		document.getElementById("chart0name").innerHTML = "Pot 0";
+			        		$('.hideChart').show();
+			        		document.getElementById("chart1name").innerHTML = "Pot 1";
+			        	}
+			        }
+		    	});
+		    	socket.on('timespan', function (timeSpanValue) {
+		        	document.getElementById("timeSpanInputBox").value = timeSpanValue;
+		    	});
+		    	
+				setInterval(function() {
+					if(heartBeatID == lastHeartBeatID && !alreadyNotified) { 
+						// alert("Server Communications Loss!");
+						// $("<div title='Comms Loss'>Communications with the server has been lost.  If this message reappears!</div>").dialog();
+						$( "<div title='Comms Loss'>Communications with the server has been lost!</div>" ).dialog({
+							buttons: [
+							{
+								text: "Ok",
+								icons: {
+								primary: ""
+								},
+								click: function() {
+								$( this ).dialog( "close" );
+								}
+								
+								// Uncommenting the following line would hide the text,
+								// resulting in the label being used as a tooltip
+								//showText: false
+							}
+							]
+						});
+						alreadyNotified = true;
+					}
+					if(heartBeatID >= 100){
+						heartBeatID = 1;
+					}
+			        socket.emit('heartbeat', heartBeatID);
+			        lastHeartBeatID = heartBeatID;
+			}, 5000);
+				socket.on('heartbeat', function (heartbeatid) {
+					if(heartBeatID+1 == heartbeatid){
+						heartBeatID = heartbeatid;
+						alreadyNotified = false;
+					}	
+				});
+			}	
+	    	
+		    function chart0Controller($scope) {
+		      var socket = io.connect();
+		      $scope.send = function send() {
+		        try{
+		        	console.log('Sending setPoint:', document.getElementById('inputBox').value);
+		        	var setPoint = document.getElementById('inputBox').value;
+		        }
+		        catch(err){}
+			    try{
+			        console.log('Sending timeSpan:', document.getElementById('timeSpanInputBox').value);
+		        	var timeSpan = document.getElementById('timeSpanInputBox').value;
+		        }
+		        catch(err){}
+		        try {
+		        	console.log('Sending tableName:', document.getElementById('chart0tableName').value);
+		        	var tableName = document.getElementById('chart0tableName').value;
+		        }
+		        catch(err){}
+		        var data = {
+		        	tableName: tableName,
+		        	setPoint: setPoint,
+		        	timeSpan: timeSpan
+		        };
+		        socket.emit('newTableData', data);
+		        document.getElementById('myDiv').remove();
+				document.getElementById('chart0panel').style="display:none";
+		      };
+		    }
+		    function chart1Controller($scope) {
+		      var socket = io.connect();
+		      $scope.send = function send() {
+		        try{
+		        	console.log('Sending setPoint:', document.getElementById('inputBox').value);
+		        	var setPoint = document.getElementById('inputBox').value;
+		        }
+		        catch(err){}
+			    try{
+			        console.log('Sending timeSpan:', document.getElementById('timeSpanInputBox').value);
+		        	var timeSpan = document.getElementById('timeSpanInputBox').value;
+		        }
+		        catch(err){}
+		        try {
+		        	console.log('Sending tableName:', document.getElementById('chart1tableName').value);
+		        	var tableName = document.getElementById('chart1tableName').value;
+		        }
+		        catch(err){}
+		        var data = {
+		        	tableName: tableName,
+		        	setPoint: setPoint,
+		        	timeSpan: timeSpan
+		        };
+		        socket.emit('newTableData', data);
+		        document.getElementById('myDiv').remove();
+				document.getElementById('chart1panel').style="display:none";
+		      };
+		    }
+	
+			function parseRecipe(obj, parent) {
+				$(document).ready(function(){
+					var div = document.createElement("DIV");
+		        	console.log(obj);
+			        for(var key in obj){
+			        	if(typeof(obj[key])[0] === 'object'){
+				        	for(var ea = 0; ea < obj[key].length; ea++){
+				        		var divPrimary = document.createElement("DIV");
+				        		// divPrimary.style.width = divWidth;
+				        		divPrimary.className = "panel panel-primary";
+				        		var divHeading = document.createElement("DIV");
+				        		divHeading.className = "panel-heading";
+				        		var span = document.createElement("SPAN");
+				        		span.className = "pull-right clickable panel-collapsed";
+				        		var spanI = document.createElement("I");
+				        		spanI.className = "glyphicon glyphicon-chevron-down";
+				        		div = document.createElement("DIV");
+				        		var altKey;
+				        		if(obj[key].length > 1){
+				        			altKey = key+"-"+ea;
+				        		}else{
+				        			altKey = key;
+				        		}
+				        		div.id = altKey;
+				        		div.className = "panel-body";
+				        		div.style = "display: none;";
+				        		span.appendChild(spanI);
+				        		divHeading.innerHTML = altKey;
+				        		divHeading.appendChild(span);
+				        		divHeading.appendChild(div);
+				        		divPrimary.appendChild(divHeading);
+					        	document.getElementById(parent).appendChild(divPrimary);
+				        		parseRecipe((obj[key])[ea], altKey);
+				        	}
+			        	} else {
+				        	div = document.createElement("DIV");
+			        		div.id = key;
+			        		div.style = "text-align:left;";
+			        		div.innerHTML = "<b>"+key + ":</b> " + obj[key];
+			        		div.className = "test";
+				        	document.getElementById(parent).appendChild(div);
+			        	}
+			        }
+				});
+			}
+	
+		    $(document).on('click', '.panel-heading span.clickable', function(e){
+			    var $this = $(this);
+				if(!$this.hasClass('panel-collapsed')) {
+					$this.parentsUntil('.panel').find('.panel-body').slideUp();
+					$this.addClass('panel-collapsed');
+					$this.find('i').removeClass('glyphicon-chevron-up').addClass('glyphicon-chevron-down');
+				} else {
+					$this.parentsUntil('.panel').find('.panel-body').slideDown();
+					$this.removeClass('panel-collapsed');
+					$this.find('i').removeClass('glyphicon-chevron-down').addClass('glyphicon-chevron-up');
+				}
+			});
+	
+			$(document).keydown(function(e) {
+			    switch(e.which) {
+		        	case 13: // enter
+			        	try{document.getElementById("enterButton").click();}
+			        	catch(err) {}
+			        	try{document.getElementById("timeSpanEnterButton").click();}
+			        	catch(err) {}
+		        		break;
+		
+			        case 37: // left
+			        	break;
+		
+			        case 38: // up
+			        	try{document.getElementById("inputBox").value = Math.round((+document.getElementById("inputBox").value - -0.1)*100)/100;}
+			        	catch(err) {}
+			        	try{document.getElementById("timeSpanInputBox").value = Math.round(+document.getElementById("timeSpanInputBox").value + +10);} 
+			        	catch(err) {}
+			        	break;
+		
+			        case 39: // right
+			    		break;
+		
+			        case 40: // down
+			        	try{document.getElementById("inputBox").value = Math.round((+document.getElementById("inputBox").value - +0.1)*100)/100;}
+			        	catch(err) {}
+			        	try{ document.getElementById("timeSpanInputBox").value = Math.round(+document.getElementById("timeSpanInputBox").value - +10);} 
+			        	catch(err) {}
+			        	break;
+		    		default: return; // exit this handler for other keys
+				}
+				e.preventDefault(); // prevent the default action (scroll / move caret)
+			});
+	
+			// Read the recipes from the json file and append each recipe to the drop down list
+			$.getJSON("jsonFiles/recipes.json",
+				function( data ) {
+					$('#selectRecipe').append($('<option>', {
+						selected: "selected",
+			    		value: "none",
+			    		text: "No Recipe"
+					}));
+					$.each( data.recipe, function( key, val ) {
+						if(val == data.recipe[0]) {
+							$('#selectRecipe').append($('<option>', {
+								//selected: "selected",
+					    		value: val,
+					    		text: val.slice(0, -4)
+							}));
+						}else{
+					    	$('#selectRecipe').append($('<option>', {
+					    		value: val,
+					    		text: val.slice(0, -4)
+							}));
+						}
+					});
+					
+				}
+			);
+			$( document ).ready(function() {
+	
+				document.getElementById("selectRecipe").onchange = function(){
+					var changeRecipe = confirm("Are you sure you want to change the active recipe to " + this.value.slice(0,-4) + "?");  
+					if(changeRecipe){
+				      	if(this.value != "none"){
+							var socket = io.connect();
+							document.getElementById("recipeName").value = this.value;
+							this.type="submit";
+							socket.emit('recipe', this.value);
+							console.log(this.value);
+				      	}else{
+				      		$('#recipeData').empty();
+				      	}
+					}
+				};
+				$(function(){
+			        $('.panel').lobiPanel({
+			            //Options go here
+			            sortable: true
+			        });
+		        });
+				$(function(){
+			        $('.chart').mouseover(function(){
+			            var $this = $(this);
+			            $this.find(".glyphicon").addClass("glyphicon-time");
+			            $("div.ui-helper-hidden-accessible").remove();
+					});
+				});
+				$(function(){
+			        $('.chart').mouseout(function(){
+			            var $this = $(this);
+			            $this.find(".glyphicon").removeClass("glyphicon-time");
+			            $("div.ui-helper-hidden-accessible").remove();
+			        });
+				});
+			    $(function () {
+			        $("[rel='tooltip']").tooltip();
+			    });
+			    $(function () {
+				    $(".tip-right").tooltip({
+				        placement : 'left'
+				    });
+			    });
+			    
+				$(document).on('click touch', '#timeSpanUpButton', function(){
+		    		var curval = document.getElementById('timeSpanInputBox').value;
+		    		var max = document.getElementById('timeSpanInputBox').max;
+		    		var inc = document.getElementById('timeSpanInputBox').step;
+		    		if(+curval <= (+max + -inc) ){
+						document.getElementById('timeSpanInputBox').value = +curval + +inc;
+		    		} else {
+						document.getElementById('timeSpanInputBox').value = max;
+		    		}
+		    	});
+	
+		    	$(document).on('click', '#timeSpanDownButton', function(){
+		    		var curval = document.getElementById('timeSpanInputBox').value;
+		    		var min = document.getElementById('timeSpanInputBox').min;
+		    		var inc = document.getElementById('timeSpanInputBox').step;
+		    		if(+curval >= (+min + +inc) ){
+						document.getElementById('timeSpanInputBox').value = +curval - +inc;
+		    		} else {
+						document.getElementById('timeSpanInputBox').value = min;
+		    		}
+		    	});
+	
+			    $(document).on('click', '.spanContainer span.clickable', function(){
+					if(document.getElementById('myDiv')){
+						document.getElementById('chart0panel').style="display:none";
+						document.getElementById('chart1panel').style="display:none";
+			    		document.getElementById('myDiv').remove();
+			    	}
+			    	if(document.getElementById('myDiv') === null){
+				    	var $this = $(this);
+					    var chartname = $this.closest(".chart").find(".chart").attr("id");
+					    var tablename = $this.closest(".chart").find(".chart").attr("tableName");
+		    			$this.closest(".panel").find(".charttimeSpan").value = tablename;
+			        	console.log('Getting Timespan For:'+tablename);
+			    		var socket = io.connect();
+			        	socket.emit('getTimeSpan', tablename);
+		
+						document.getElementById(chartname+'panel').style="display:block;";
+		
+			  			var myDiv = document.createElement("DIV");
+			  			myDiv.id="myDiv";
+						document.getElementById(chartname+'form').appendChild(myDiv);
+			  			document.getElementById('myDiv').innerHTML="Chart Timespan";
+		
+						var upButton = document.createElement("BUTTON");
+						upButton.id='timeSpanUpButton';
+						upButton.value='1';
+						document.getElementById("myDiv").appendChild(upButton);
+						//upButton.mousePressed(function() { (document.getElementById("timeSpan").value)++; });
+						$this=(document.getElementById('timeSpanUpButton'));
+						$this.className="btn btn-default btn-block";
+						$this.type = "button";
+						$this.innerHTML = "▲";
+						$this.style = "width:50% height:50%";
+						
+						var input = document.createElement("INPUT");
+						input.id='timeSpanInputBox';
+						document.getElementById("myDiv").appendChild(input);
+						$this=(document.getElementById('timeSpanInputBox'));
+						$this.className="col-md-3 form-control";
+						$this.type = "number";
+						$this.min = 30;
+						$this.max = 6000;
+						$this.step = 10;
+						$this.style = "max-width:50% height:24px text-align:center";
+			
+						var downButton = document.createElement("BUTTON");
+						downButton.id='timeSpanDownButton';
+						downButton.value='1';
+						document.getElementById("myDiv").appendChild(downButton);
+						//downButton.mousePressed(function() { (document.getElementById("timeSpan").value)++; });
+						$this=(document.getElementById('timeSpanDownButton'));
+						$this.className="btn btn-default btn-block";
+						$this.type = "button";
+						$this.innerHTML = "▼";
+						$this.style = "width:50% height:50%";
+	
+						var enterButton = document.createElement("BUTTON");
+						enterButton.id='timeSpanEnterButton';
+						document.getElementById("myDiv").appendChild(enterButton);
+						// enterButton.mousePressed(writeSetpoint);
+						$this=(document.getElementById('timeSpanEnterButton'));
+						$this.className="btn btn-default btn-block";
+						$this.type = "submit";
+						$this.innerHTML = "Enter";
+						$this.value = "Send";
+						$this.style = "width:50% height:50%";
+						document.getElementById('timeSpanInputBox').focus();
+			    	}
+				});
+			});
+    	} 
+    	catch (err){
+    		console.log(err);
+
+    	}
+		
+</script>
+</head>
+<body>
+	<header >Brew Controller</header>
+	<div class="col-xs-6 col-md-4 lobipanel-parent-sortable">
+		<div class="panel panel-default">
+		    <div class="panel-heading">
+		        <div class="panel-title">Recipe</div>
+		    </div>
+		    <div class="panel-body">
+				<div class="container" ng-controller="recipeController" style="max-width: 100%">
+					<form class="form-inline" ng-submit="send()" id="recipeform">
+						<input type="hidden" id="recipeName"></input>
+						<span>
+							<label>Recipe</label>
+							<select size="1" id="selectRecipe" class="form-control" name="Recipe"></select>
+						</span>
+					</form>
+				</div>
+		    </div>
+		</div>
+		<div class="panel panel-default">
+		    <div class="panel-heading">
+		        <div class="panel-title">Details
+		            <span class="pull-right clickable"><i class="glyphicon glyphicon-chevron-down hideContent"></i></span>
+		        </div>
+		    </div>
+		    <div class="panel-body">
+				<div id="recipeData" class="panel-body"></div>
+		    </div>
+		</div>
+	</div>
+	<div class="col-xs-6 col-md-4 lobipanel-parent-sortable">
+		<div class="panel panel-default">
+		    <div class="panel-heading">
+		        <div class="panel-title">
+		            <div id="chart0name">Pot 0</div>
+		        </div>
+		    </div>
+		    <div class="panel-body chart">
+				<div class="container" ng-controller="chart0Controller" style="max-width: 50%; text-align:center">
+					<form ng-submit="send()" id="chart0form">
+						<input type="hidden" id="chart0tableName" ng-model="tableName" value="control0_temp"></input>
+						<input type="hidden" id="chart0setPoint" ng-model="setPoint"></input>
+						<input type="hidden" id="chart0timeSpan" ng-model="timeSpan" value="" class="charttimeSpan"></input>
+					</form>
+				</div>
+		        <div id="chart0" class="chart0 chart" tableName="control0_temp"></div>
+				<div class="spanContainer" style="margin:0px; position:relative; top:-20px;">
+					<span class="pull-left clickable"  onclick="void(0)" style="max-height:0px">
+						<a href="#" class="tip-right clickable" rel="tooltip" title="Change Time Span">
+							<i class="glyphicon"></i>
+						</a>
+					</span>
+				</div>
+		        <script language="javascript" type="text/javascript" src="lib/p5js/createChart.js"></script>
+				<script type="text/javascript">
+					MYLIBRARY.init([0, document.getElementById('chart0').offsetWidth, "chart0"]);
+					MYLIBRARY.createChart();
+				</script>
+		    </div>
+		    <div id="chart0panel"></div>
+		</div>
+		<div class="panel panel-default">
+		    <div class="panel-heading">
+		        <div class="panel-title">
+		            <div id="chart1name">Pot 1</div>
+		        </div>
+		    </div>
+	    	<div class="panel-body chart">
+				<div class="container" ng-controller="chart1Controller" style="max-width: 50%; text-align:center">
+					<form ng-submit="send()" id="chart1form">
+						<input type="hidden" id="chart1tableName" ng-model="tableName" value="control1_temp"></input>
+						<input type="hidden" id="chart1setPoint" ng-model="setPoint"></input>
+						<input type="hidden" id="chart1timeSpan" ng-model="timeSpan" value="" class="charttimeSpan"></input>
+					</form>
+				</div>
+		        <div id="chart1" class="chart1 chart" tableName="control1_temp"></div>
+				<div class="spanContainer" style="margin:0px; position:relative; top:-20px;">
+					<span class="pull-left clickable" onclick="void(0)" style="max-height:0px;">
+						<a href="#" class="tip-right clickable" rel="tooltip" title="Change Time Span">
+							<i class="glyphicon"></i>
+						</a>
+					</span>
+				</div>
+				<script type="text/javascript">
+					MYLIBRARY.init([1, document.getElementById('chart1').offsetWidth, "chart1"]);
+					MYLIBRARY.createChart();
+				</script>
+			</div>
+		    <div id="chart1panel">
+	        </div>
+		</div>
+	</div>
+	<div class="col-xs-6 col-md-4 lobipanel-parent-sortable">
+		<div class="panel panel-default">
+		    <div class="panel-heading">
+		        <div class="panel-title">Recipe Scheduler</div>
+		    </div>
+		    <div class="panel-body">
+				<div class="scheduler">
+					<div class="btn-group-vertical" role="group" aria-label="...">
+						<button type="button" role="group" class="btn btn-default btn-block">Step 1
+							<div class="col-xs-12" id="timedEvent1"></div>
+							<input class="timedEvent" type="time" value="00:00"></input>
+						</button>
+						<button type="button" role="group" class="btn btn-default btn-block">Step 2
+							<div class="col-xs-12" id="timedEvent1"></div>
+							<input class="timedEvent" type="time" value="00:00"></input>
+						</button>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<div class="col-xs-6 col-md-4 lobipanel-parent-sortable">
+		<div class="panel panel-default">
+		    <div class="panel-heading">
+		        <div class="panel-title">Panel title</div>
+		    </div>
+		    <div class="panel-body">
+		        Lorem ipsum...
+		    </div>
+		</div>
+	</div>
+	<script src="/socket.io/socket.io.js"></script>
+	<script src="/js/jquery.min.js"></script>
+	<script src="/js/bootstrap.min.js"></script>
+	<script src="/js/angular.min.js"></script>
+	<script src="/js/jquery-ui.min.js"></script>
+	<script src="/js/jquery.ui.touch-punch.min.js"></script>
+	<script src="/js/lobipanel.js"></script>
+</body>
+</html>
